@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartAttend - QR Scanner</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+        }
+        
+        ::-webkit-scrollbar { 
+            display: none; 
+        }
+        
+        .scan-line {
+            animation: scan-line 2s linear infinite;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+        }
+        
+        @keyframes scan-line {
+            0% { top: 0; opacity: 1; }
+            45% { opacity: 1; }
+            50% { top: 100%; opacity: 0; }
+            50.1% { top: 0; opacity: 0; }
+            55% { opacity: 1; }
+            100% { top: 100%; opacity: 1; }
+        }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #4282e9 0%, #8B5CF6 100%);
+        }
+        
+        .pulse-border {
+            animation: pulse-border 2s infinite;
+        }
+        
+        @keyframes pulse-border {
+            0%, 100% { 
+                border-color: #3B82F6;
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+            }
+            50% { 
+                border-color: #8B5CF6;
+                box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+            }
+        }
+        
+        .success-animation {
+            animation: successPulse 0.6s ease-out;
+        }
+        
+        @keyframes successPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Hide html5-qrcode default elements */
+        #reader__dashboard_section {
+            display: none !important;
+        }
+        
+        #reader__header_message {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-900 text-white min-h-screen flex flex-col p-4">
+    
+    <!-- Header -->
+    <header class="w-full max-w-md mx-auto flex justify-between items-center py-4">
+        <div class="flex items-center space-x-3">
+            <button onclick="goBack()" class="w-10 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors">
+                <i class="fas fa-arrow-left text-gray-300"></i>
+            </button>
+            <div class="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center">
+                <i class="fas fa-qrcode text-white text-sm"></i>
+            </div>
+            <h1 class="text-xl font-bold">QR Scanner</h1>
+        </div>
+        
+        <button id="toggle-camera" class="w-10 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors" style="display: none;">
+            <i class="fas fa-camera-rotate text-gray-300"></i>
+        </button>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow flex flex-col items-center justify-center w-full max-w-md mx-auto mt-4">
+        
+        <!-- Status Message -->
+        <div class="text-center mb-6">
+            <p id="scanning-status" class="text-gray-400 text-lg">Initializing camera...</p>
+            <div id="loading-spinner" class="flex justify-center mt-2">
+                <div class="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
+            </div>
+        </div>
+
+        <!-- Scanner Container -->
+        <div id="scanner-container" class="relative w-full aspect-square border-4 border-blue-500 rounded-2xl overflow-hidden shadow-2xl pulse-border">
+            <div id="reader" class="w-full h-full bg-black flex items-center justify-center">
+                <div class="text-center text-gray-500">
+                    <i class="fas fa-camera text-4xl mb-2"></i>
+                    <p>Camera loading...</p>
+                </div>
+            </div>
+            
+            <!-- Scanning overlay -->
+            <div id="scan-overlay" class="absolute inset-4 border-2 border-white/30 rounded-xl pointer-events-none opacity-0">
+                <div class="scan-line absolute w-full h-1 bg-blue-400"></div>
+                <!-- Corner markers -->
+                <div class="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-white"></div>
+                <div class="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-white"></div>
+                <div class="absolute bottom-0 left-0 w-6 h-6 border-b-2 border-l-2 border-white"></div>
+                <div class="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-white"></div>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="mt-6 p-4 bg-gray-800 rounded-xl w-full">
+            <div class="flex items-center mb-2">
+                <i class="fas fa-info-circle text-blue-400 mr-2"></i>
+                <span class="font-semibold">Instructions</span>
+            </div>
+            <ul class="text-sm text-gray-300 space-y-1">
+                <li>• Position QR code within the frame</li>
+                <li>• Ensure good lighting</li>
+                <li>• Hold device steady</li>
+                <li>• Wait for automatic detection</li>
+            </ul>
+        </div>
+    </main>
+
+    <!-- Status Toast -->
+    <div id="status-toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 p-4 bg-gray-800 border border-gray-600 rounded-xl shadow-xl text-center hidden max-w-sm mx-auto">
+        <div class="flex items-center justify-center space-x-2">
+            <div id="toast-icon" class="text-xl"></div>
+            <p id="toast-message" class="font-medium"></p>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="success-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-gray-800 border border-gray-600 p-8 rounded-2xl max-w-sm mx-auto text-center success-animation">
+            <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-check text-green-400 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-2">Success!</h3>
+            <p id="success-message" class="text-gray-300 mb-6">Attendance marked successfully</p>
+            <div class="w-full gradient-bg py-3 rounded-xl text-white font-medium">
+                Redirecting...
+            </div>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div id="error-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-gray-800 border border-gray-600 p-8 rounded-2xl max-w-sm mx-auto text-center">
+            <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
+            </div>
+            <h3 class="text-xl font-bold mb-2">Error</h3>
+            <p id="error-message" class="text-gray-300 mb-6">Something went wrong</p>
+            <button onclick="closeErrorModal()" class="w-full bg-red-600 hover:bg-red-700 py-3 rounded-xl text-white font-medium transition-colors">
+                Try Again
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let html5QrcodeScanner;
+        let currentCameraId = null;
+        let cameras = [];
+        let isScanning = false;
+
+        const reader = document.getElementById('reader');
+        const toggleButton = document.getElementById('toggle-camera');
+        const toast = document.getElementById('status-toast');
+        const toastMessage = document.getElementById('toast-message');
+        const toastIcon = document.getElementById('toast-icon');
+        const scanningStatus = document.getElementById('scanning-status');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const scanOverlay = document.getElementById('scan-overlay');
+
+        // Update status message
+        function updateStatus(message, showSpinner = false) {
+            scanningStatus.textContent = message;
+            loadingSpinner.style.display = showSpinner ? 'flex' : 'none';
+        }
+
+        // Show scanning overlay
+        function showScanOverlay() {
+            scanOverlay.style.opacity = '1';
+        }
+
+        // Function to handle successful scan
+        const onScanSuccess = async (decodedText, decodedResult) => {
+            if (isScanning) return; // Prevent multiple scans
+            isScanning = true;
+            
+            console.log(`Scan successful: ${decodedText}`);
+            updateStatus('Processing...', true);
+            showToast('QR code detected!', 'fas fa-qrcode', 'text-blue-400');
+            
+            try {
+                console.log("Marking attendance for:", decodedText);
+                
+                // Parse the QR code data
+                let userData;
+                try {
+                    userData = JSON.parse(decodedText);
+                } catch (parseError) {
+                    // If it's not JSON, treat as simple text
+                    userData = { id: decodedText };
+                }
+                
+                const userId = userData.id || decodedText;
+                console.log("User ID:", userId);
+
+                // Make API call to mark attendance
+                const response = await fetch("https://amsbackend-xx23.onrender.com/api/User/attendance/mark", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        id: userId 
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log("Response from server:", result);
+
+                if (result.success) {
+                    updateStatus('Success!', false);
+                    document.getElementById('success-message').textContent = result.message;
+                    document.getElementById('success-modal').classList.remove('hidden');
+                    
+                    localStorage.setItem('attendanceMarked', result.message);
+                    
+                    // Stop scanner
+                    stopScanner();
+                    
+                    // Redirect after delay
+                    setTimeout(() => {
+                        window.location.href = 'checkin.html';
+                    }, 2000);
+
+                } else if (result.error) {
+                    updateStatus('Error occurred', false);
+                    showErrorModal(result.error);
+                    
+                    setTimeout(() => {
+                        window.location.href = 'not-eligible.html';
+                    }, 2000);
+
+                } else {
+                    updateStatus('Failed to process', false);
+                    showErrorModal("Failed to mark attendance. Please try again.");
+                }
+                
+            } catch (error) {
+                console.error("Error marking attendance:", error);
+                updateStatus('Connection error', false);
+                showErrorModal("Network error. Please check your connection and try again.");
+            }
+        };
+
+        // Function to handle scan errors (mostly ignored)
+        const onScanFailure = (error) => {
+            // This is normal during scanning - don't log every frame
+        };
+
+        // Function to start the QR scanner
+        const startScanner = async (cameraId) => {
+            try {
+                if (html5QrcodeScanner) {
+                    await html5QrcodeScanner.stop();
+                    html5QrcodeScanner.clear();
+                }
+
+                html5QrcodeScanner = new Html5Qrcode("reader");
+                
+                await html5QrcodeScanner.start(
+                    cameraId,
+                    { 
+                        fps: 10, 
+                        qrbox: { width: 250, height: 250 },
+                        aspectRatio: 1.0
+                    },
+                    onScanSuccess,
+                    onScanFailure
+                );
+
+                updateStatus('Point camera at QR code', false);
+                showScanOverlay();
+                
+            } catch (err) {
+                console.error("Failed to start scanner", err);
+                updateStatus('Camera failed to start', false);
+                showErrorModal("Error: Camera access failed. Please check permissions.");
+            }
+        };
+
+        // Function to stop scanner
+        const stopScanner = async () => {
+            if (html5QrcodeScanner) {
+                try {
+                    await html5QrcodeScanner.stop();
+                    html5QrcodeScanner.clear();
+                } catch (err) {
+                    console.error("Error stopping scanner:", err);
+                }
+            }
+        };
+
+        // Function to switch between cameras
+        const switchCamera = async () => {
+            const currentIndex = cameras.findIndex(cam => cam.id === currentCameraId);
+            const nextIndex = (currentIndex + 1) % cameras.length;
+            currentCameraId = cameras[nextIndex].id;
+            
+            updateStatus('Switching camera...', true);
+            await startScanner(currentCameraId);
+        };
+
+        // Function to show toast notifications
+        const showToast = (message, iconClass = '', iconColor = '') => {
+            toastMessage.textContent = message;
+            toastIcon.className = `${iconClass} ${iconColor}`;
+            toast.classList.remove('hidden');
+            
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        };
+
+        // Show error modal
+        const showErrorModal = (message) => {
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('error-modal').classList.remove('hidden');
+        };
+
+        // Close error modal
+        const closeErrorModal = () => {
+            document.getElementById('error-modal').classList.add('hidden');
+            isScanning = false;
+            // Restart scanner if needed
+            if (currentCameraId && !html5QrcodeScanner.getState()) {
+                startScanner(currentCameraId);
+            }
+        };
+
+        // Go back function
+        const goBack = () => {
+            stopScanner();
+            window.history.back();
+        };
+
+        // Initialize the scanner
+        const initializeScanner = async () => {
+            try {
+                updateStatus('Getting camera access...', true);
+                
+                const cameraList = await Html5Qrcode.getCameras();
+                
+                if (cameraList && cameraList.length) {
+                    cameras = cameraList;
+                    // Prefer back camera for mobile devices
+                    const backCamera = cameras.find(camera => 
+                        camera.label.toLowerCase().includes('back') || 
+                        camera.label.toLowerCase().includes('rear')
+                    );
+                    currentCameraId = backCamera ? backCamera.id : cameras[0].id;
+                    
+                    await startScanner(currentCameraId);
+                    
+                    // Show camera toggle button if multiple cameras
+                    if (cameras.length > 1) {
+                        toggleButton.style.display = 'flex';
+                        toggleButton.onclick = switchCamera;
+                    }
+                } else {
+                    updateStatus('No camera found', false);
+                    showErrorModal("No camera found. Please check your device.");
+                }
+            } catch (err) {
+                console.error("Error getting cameras", err);
+                updateStatus('Camera access denied', false);
+                showErrorModal("Camera access denied. Please allow camera permissions and refresh the page.");
+            }
+        };
+
+        // Cleanup when leaving page
+        window.addEventListener('beforeunload', () => {
+            stopScanner();
+        });
+
+        // Initialize when page loads
+        window.addEventListener('load', initializeScanner);
+
+        // Handle visibility change (pause/resume scanner)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopScanner();
+            } else if (currentCameraId && !isScanning) {
+                setTimeout(() => {
+                    initializeScanner();
+                }, 500);
+            }
+        });
+    </script>
+</body>
+</html>
